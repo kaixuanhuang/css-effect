@@ -146,6 +146,9 @@ imgcallcc(image => {
     attribute vec2 aUv;
     attribute vec4 aPosition;
     varying vec2 vUv;
+    uniform mat4 mWorld;
+    uniform mat4 mView;
+    uniform mat4 mProj;
     void main() {  
         vec3 theta = vec3(15.0,30.0,20.0);
         vec3 angles = radians(theta);
@@ -159,9 +162,8 @@ imgcallcc(image => {
                        0.0, 1.0, 0.0, 0.0,
                        s.y, 0.0, c.y, 0.0,
                        0.0, 0.0, 0.0, 1.0); 
-                                 
-        mat4 world = mat4(1.0).lookat;
-        gl_Position =  world * aPosition  ;
+                                
+        gl_Position =  mProj * mView * mWorld * rx * aPosition  ;
         gl_PointSize = 10.0;
         vUv = aUv;
     }
@@ -173,7 +175,7 @@ imgcallcc(image => {
     uniform sampler2D uMap0;
     varying vec2 vUv;
     void main() {  
-        gl_FragColor = vec4(0.0,1.0,0.0,1.0);
+        gl_FragColor = texture2D(uMap0,vUv);
     }
 `
     })
@@ -255,53 +257,70 @@ imgcallcc(image => {
                 ]), gl.STATIC_DRAW);
 
 
+            var matWorldUniformLocation = gl.getUniformLocation(shader.program, 'mWorld');
+            var matViewUniformLocation = gl.getUniformLocation(shader.program, 'mView');
+            var matProjUniformLocation = gl.getUniformLocation(shader.program, 'mProj');
 
-            gl.drawElements(this.gl.TRIANGLES, 36, this.gl.UNSIGNED_SHORT, 0);
+            var worldMatrix = new Float32Array(16);
+            var viewMatrix = new Float32Array(16);
+            var projMatrix = new Float32Array(16);
+            mat4.identity(worldMatrix);
+            mat4.lookAt(viewMatrix, [0, 0, -8], [0, 0, 0], [0, 1, 0]);
+            mat4.perspective(projMatrix, glMatrix.toRadian(45), canvas.clientWidth / canvas.clientHeight, 0.1, 1000.0);
+
+            gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
+            gl.uniformMatrix4fv(matViewUniformLocation, gl.FALSE, viewMatrix);
+            gl.uniformMatrix4fv(matProjUniformLocation, gl.FALSE, projMatrix);
+
+
+
+
             //{ semantic: pc.SEMANTIC_TEXCOORD0, components: 2, type: pc.TYPE_FLOAT32 }
 
             // new Float32BufferAttribute( uvs, 2 )
-            // const tbuffer = gl.createBuffer();
-            // gl.bindBuffer(gl.ARRAY_BUFFER,tbuffer);
-            // gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([
-            //     0.0,  0.0,
-            //     1.0,  0.0,
-            //     0.0,  1.0,
-            //     0.0,  1.0,
-            //     1.0,  0.0,
-            //     1.0,  1.0
-            // ]),gl.STATIC_DRAW);
-            // var  aUv = gl.getAttribLocation(shader.program,"aUv");
-            // gl.enableVertexAttribArray(aUv);
-            // gl.vertexAttribPointer(aUv,2,gl.FLOAT,false,0,0);
-            // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            const tbuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,tbuffer);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([
+                0.0,  0.0,
+                1.0,  0.0,
+                0.0,  1.0,
+                0.0,  1.0,
+                1.0,  0.0,
+                1.0,  1.0
+            ]),gl.STATIC_DRAW);
+            var  aUv = gl.getAttribLocation(shader.program,"aUv");
+            gl.enableVertexAttribArray(aUv);
+            gl.vertexAttribPointer(aUv,2,gl.FLOAT,false,0,0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
             //
             //
             //
             //
             //
             //
-            // var texture1 = gl.createTexture();
-            // gl.bindTexture(gl.TEXTURE_2D,texture1);
-            // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-            // var img = _downsampleImage(image,maxTextureSize);
-            //
-            // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE, img);
-            // gl.generateMipmap(gl.TEXTURE_2D);
-            // gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_LINEAR);
-            // gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-            // //图片的分辨率不属于2的幂数 需要设置
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            //
-            //
-            //
-            //
-            // var textureUnitIndex = 0;
-            // gl.activeTexture(gl.TEXTURE0 + textureUnitIndex);
-            // gl.bindTexture(gl.TEXTURE_2D,texture1);
-            // gl.uniform1i(gl.getUniformLocation(shader.program,"uMap0"),textureUnitIndex);
+            var texture1 = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D,texture1);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+            var img = _downsampleImage(image,maxTextureSize);
+
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE, img);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+            //图片的分辨率不属于2的幂数 需要设置
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 
+
+
+            var textureUnitIndex = 0;
+            gl.activeTexture(gl.TEXTURE0 + textureUnitIndex);
+            gl.bindTexture(gl.TEXTURE_2D,texture1);
+            gl.uniform1i(gl.getUniformLocation(shader.program,"uMap0"),textureUnitIndex);
+
+
+            gl.drawElements(this.gl.TRIANGLES, 36, this.gl.UNSIGNED_SHORT, 0);
 
             return ShaderState.of(shader);
         })
@@ -349,4 +368,5 @@ function destroy() {
         device.removeShaderFromCache(_shader);
     }
 }
+
 
